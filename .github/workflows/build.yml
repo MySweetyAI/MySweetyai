@@ -19,23 +19,11 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Create Gradle Setup Files
+    - name: Create Modern Gradle Setup Files
       run: |
         cat << 'EOF' > build.gradle
-        buildscript {
-            repositories {
-                google()
-                mavenCentral()
-            }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:8.1.1'
-            }
-        }
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-            }
+        plugins {
+            id 'com.android.application' version '8.1.1' apply false
         }
         EOF
 
