@@ -19,10 +19,11 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle Version 8.2
+    - name: Setup Gradle Version 8.2 (No Cache)
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.2'
+        cache-disabled: true
 
     - name: Create Gradle Setup Files
       run: |
