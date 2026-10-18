@@ -19,7 +19,12 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Create Modern Gradle Setup Files
+    - name: Setup Gradle Version 8.2
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.2'
+
+    - name: Create Gradle Setup Files
       run: |
         cat << 'EOF' > build.gradle
         plugins {
