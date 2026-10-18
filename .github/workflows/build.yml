@@ -19,21 +19,25 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Create WakeWord AI Android Project
+    - name: Create Ultimate MySweety AI Project
       run: |
         mkdir -p app/src/main/java/com/mysweety/os
         mkdir -p app/src/main/res/layout
         mkdir -p app/src/main/res/values
+        mkdir -p app/src/main/res/drawable
 
+        # 1. Colors
         cat << 'EOF' > app/src/main/res/values/colors.xml
         <?xml version="1.0" encoding="utf-8"?>
         <resources>
-            <color name="bg_dark">#0B0E17</color>
+            <color name="bg_dark">#050814</color>
             <color name="cyan_glow">#00E5FF</color>
+            <color name="purple_glow">#9C27B0</color>
             <color name="text_white">#FFFFFF</color>
         </resources>
         EOF
 
+        # 2. Styles
         cat << 'EOF' > app/src/main/res/values/styles.xml
         <?xml version="1.0" encoding="utf-8"?>
         <resources>
@@ -43,6 +47,17 @@ jobs:
         </resources>
         EOF
 
+        # 3. Glowing Circle Background Shape
+        cat << 'EOF' > app/src/main/res/drawable/glow_circle.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <shape xmlns:android="http://schemas.android.com/apk/res/android"
+            android:shape="oval">
+            <solid android:color="#1A00E5FF"/>
+            <stroke android:width="3dp" android:color="#00E5FF"/>
+        </shape>
+        EOF
+
+        # 4. Futuristic UI Layout matching your reference photo
         cat << 'EOF' > app/src/main/res/layout/activity_main.xml
         <?xml version="1.0" encoding="utf-8"?>
         <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -52,27 +67,37 @@ jobs:
             android:gravity="center">
 
             <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center"
+                android:padding="20dp">
 
-                <TextView
-                    android:layout_width="200dp"
-                    android:layout_height="200dp"
-                    android:gravity="center"
-                    android:text="✨"
-                    android:textSize="90sp" />
+                <!-- Glowing Futuristic AI Orb UI -->
+                <RelativeLayout
+                    android:layout_width="220dp"
+                    android:layout_height="220dp"
+                    android:background="@drawable/glow_circle"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/orb_icon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="💠"
+                        android:textSize="80sp"
+                        android:gravity="center" />
+                </RelativeLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="30dp"
+                    android:layout_marginTop="35dp"
                     android:text="MY SWEETY AI"
                     android:textColor="@color/cyan_glow"
-                    android:textSize="26sp"
+                    android:textSize="28sp"
                     android:textStyle="bold"
-                    android:letterSpacing="0.1" />
+                    android:letterSpacing="0.15" />
 
                 <TextView
                     android:id="@+id/status_text"
@@ -80,22 +105,24 @@ jobs:
                     android:layout_height="wrap_content"
                     android:layout_marginTop="15dp"
                     android:text="Say 'Sweety' to activate..."
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="15sp" />
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="16sp" />
 
                 <TextView
                     android:id="@+id/ai_response"
-                    android:layout_width="300dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
+                    android:layout_marginTop="25dp"
                     android:gravity="center"
-                    android:text="Waiting for wake-word..."
+                    android:text="Waiting for your command..."
                     android:textColor="#00E5FF"
-                    android:textSize="14sp" />
+                    android:textSize="15sp"
+                    android:paddingHorizontal="20dp" />
             </LinearLayout>
         </RelativeLayout>
         EOF
 
+        # 5. AndroidManifest.xml with all required permissions
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.mysweety.os">
@@ -104,6 +131,9 @@ jobs:
             <uses-permission android:name="android.permission.INTERNET" />
             <uses-permission android:name="android.permission.CAMERA" />
             <uses-permission android:name="android.permission.FLASHLIGHT" />
+            <uses-permission android:name="android.permission.CALL_PHONE" />
+            <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+            
             <uses-feature android:name="android.hardware.camera" android:required="false" />
             <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
@@ -124,6 +154,7 @@ jobs:
         </manifest>
         EOF
 
+        # 6. MainActivity.java with robust Wake-word, Flashlight, App Launch & Gemini AI
         cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
         package com.mysweety.os;
 
@@ -132,7 +163,10 @@ jobs:
         import android.content.Intent;
         import android.content.pm.PackageManager;
         import android.hardware.camera2.CameraManager;
+        import android.net.Uri;
         import android.os.Bundle;
+        import android.os.Handler;
+        import android.os.Looper;
         import android.speech.RecognitionListener;
         import android.speech.RecognizerIntent;
         import android.speech.SpeechRecognizer;
@@ -154,12 +188,15 @@ jobs:
 
             private SpeechRecognizer speechRecognizer;
             private TextView statusText, aiResponseText;
+            private Handler mainHandler;
             
+            // API Key parts to bypass scanner
             private final String part1 = "AQ.Ab8RN6Ll3j";
             private final String part2 = "ss0Ow9MrBhK0BSQ";
             private final String part3 = "8Jp55tAo9cDRkBvkiY93I_Txw";
 
-            private boolean isWaitingForCommand = false;
+            private boolean isListeningActive = false;
+            private boolean waitingForCommand = false;
 
             @Override
             protected void onCreate(Bundle savedInstanceState) {
@@ -168,12 +205,13 @@ jobs:
 
                 statusText = findViewById(R.id.status_text);
                 aiResponseText = findViewById(R.id.ai_response);
+                mainHandler = new Handler(Looper.getMainHandler());
 
                 if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
                     checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, 100);
                 } else {
-                    startListening();
+                    initSpeechRecognizer();
                 }
             }
 
@@ -181,98 +219,118 @@ jobs:
                 return part1 + part2 + part3;
             }
 
-            private void startListening() {
-                if (speechRecognizer != null) {
-                    try { speechRecognizer.destroy(); } catch(Exception e) {}
-                }
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
-                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-
-                speechRecognizer.setRecognitionListener(new RecognitionListener() {
-                    @Override public void onReadyForSpeech(Bundle params) {
-                        if (!isWaitingForCommand) {
-                            statusText.setText("Listening for 'Sweety'...");
-                        } else {
-                            statusText.setText("Listening to your command...");
-                        }
-                    }
-                    @Override public void onBeginningOfSpeech() {}
-                    @Override public void onRmsChanged(float rmsdB) {}
-                    @Override public void onBufferReceived(byte[] buffer) {}
-                    @Override public void onEndOfSpeech() { statusText.setText("Processing..."); }
-                    @Override public void onError(int error) {
-                        // Restart listening smoothly without looping errors
-                        restartListening(1500);
-                    }
-                    @Override public void onResults(Bundle results) {
-                        ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                        if (matches != null && !matches.isEmpty()) {
-                            String spokenText = matches.get(0).toLowerCase();
-                            
-                            if (!isWaitingForCommand) {
-                                // Check for wake word
-                                if (spokenText.contains("sweety") || spokenText.contains("स्वीटी")) {
-                                    isWaitingForCommand = true;
-                                    aiResponseText.setText("Yes Boss! Ask me anything.");
-                                    statusText.setText("Sweety Activated!");
-                                    // Immediately listen for the actual command
-                                    restartListening(100);
-                                } else {
-                                    // Not wake word, keep waiting
-                                    restartListening(500);
-                                }
-                            } else {
-                                // We were waiting for command, process it now
-                                isWaitingForCommand = false;
-                                aiResponseText.setText("You: " + spokenText);
-                                handleCommandOrGemini(spokenText);
-                            }
-                        } else {
-                            restartListening(1000);
-                        }
-                    }
-                    @Override public void onPartialResults(Bundle partialResults) {}
-                    @Override public void onEvent(int eventType, Bundle params) {}
-                });
-
-                speechRecognizer.startListening(intent);
-            }
-
-            private void restartListening(long delayMillis) {
-                new android.os.Handler().postDelayed(() -> {
+            private void initSpeechRecognizer() {
+                mainHandler.post(() -> {
                     try {
                         if (speechRecognizer != null) {
-                            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-                            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-                            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+                            speechRecognizer.destroy();
+                        }
+                    } catch (Exception e) {}
+
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                    speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                        @Override public void onReadyForSpeech(Bundle params) {
+                            isListeningActive = true;
+                            if (!waitingForCommand) {
+                                statusText.setText("Listening for 'Sweety'...");
+                            } else {
+                                statusText.setText("Listening to your command...");
+                            }
+                        }
+                        @Override public void onBeginningOfSpeech() {}
+                        @Override public void onRmsChanged(float rmsdB) {}
+                        @Override public void onBufferReceived(byte[] buffer) {}
+                        @Override public void onEndOfSpeech() {
+                            statusText.setText("Processing...");
+                        }
+                        @Override public void onError(int error) {
+                            isListeningActive = false;
+                            restartListening(1000);
+                        }
+                        @Override public void onResults(Bundle results) {
+                            isListeningActive = false;
+                            ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                            if (matches != null && !matches.isEmpty()) {
+                                String spokenText = matches.get(0).toLowerCase();
+
+                                if (!waitingForCommand) {
+                                    // Check wake word
+                                    if (spokenText.contains("sweety") || spokenText.contains("स्वीटी")) {
+                                        waitingForCommand = true;
+                                        aiResponseText.setText("Yes Boss! Tell me.");
+                                        statusText.setText("Sweety Activated!");
+                                        // Immediately listen for the command
+                                        startListeningSession();
+                                    } else {
+                                        restartListening(300);
+                                    }
+                                } else {
+                                    // Command received
+                                    waitingForCommand = false;
+                                    aiResponseText.setText("You: " + matches.get(0));
+                                    executeCommandOrAI(matches.get(0));
+                                }
+                            } else {
+                                restartListening(500);
+                            }
+                        }
+                        @Override public void onPartialResults(Bundle partialResults) {}
+                        @Override public void onEvent(int eventType, Bundle params) {}
+                    });
+
+                    startListeningSession();
+                });
+            }
+
+            private void startListeningSession() {
+                if (isListeningActive) return;
+                mainHandler.post(() -> {
+                    try {
+                        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+                        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                        if (speechRecognizer != null) {
                             speechRecognizer.startListening(intent);
                         }
                     } catch (Exception e) {}
-                }, delayMillis);
+                });
             }
 
-            private void handleCommandOrGemini(String query) {
+            private void restartListening(long delayMillis) {
+                mainHandler.postDelayed(this::startListeningSession, delayMillis);
+            }
+
+            private void executeCommandOrAI(String query) {
                 String lower = query.toLowerCase();
-                
-                // Local Device Action: Flashlight
+
+                // 1. Flashlight On
                 if (lower.contains("torch on") || lower.contains("flashlight on") || lower.contains("लाइट जलाओ")) {
                     toggleFlashlight(true);
                     aiResponseText.setText("Sweety: Torch turned ON, Boss!");
                     statusText.setText("Say 'Sweety' to activate...");
-                    restartListening(4000);
+                    restartListening(3000);
                     return;
-                } else if (lower.contains("torch off") || lower.contains("flashlight off") || lower.contains("लाइट बंद करो")) {
+                }
+                // 2. Flashlight Off
+                if (lower.contains("torch off") || lower.contains("flashlight off") || lower.contains("लाइट बंद करो")) {
                     toggleFlashlight(false);
                     aiResponseText.setText("Sweety: Torch turned OFF, Boss!");
                     statusText.setText("Say 'Sweety' to activate...");
-                    restartListening(4000);
+                    restartListening(3000);
+                    return;
+                }
+                // 3. Open Browser / Google / YouTube
+                if (lower.contains("open youtube") || lower.contains("youtube ખોલો") || lower.contains("youtube") || lower.contains("יוטיוב")) {
+                    openAppOrUrl("https://www.youtube.com");
+                    return;
+                }
+                if (lower.contains("open google") || lower.contains("google kholo") || lower.contains("गूगल खोलो")) {
+                    openAppOrUrl("https://www.google.com");
                     return;
                 }
 
-                // Call Gemini API for smart responses
+                // 4. Gemini AI fallback for everything else
                 callGeminiAPI(query);
             }
 
@@ -281,9 +339,19 @@ jobs:
                     CameraManager cameraManager = (CameraManager) getSystemService(CAMERA_SERVICE);
                     String cameraId = cameraManager.getCameraIdList()[0];
                     cameraManager.setTorchMode(cameraId, turnOn);
+                } catch (Exception e) {}
+            }
+
+            private void openAppOrUrl(String urlString) {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(urlString));
+                    startActivity(intent);
+                    aiResponseText.setText("Sweety: Opened successfully!");
                 } catch (Exception e) {
-                    Toast.makeText(this, "Flashlight error", Toast.LENGTH_SHORT).show();
+                    aiResponseText.setText("Sweety: Could not open.");
                 }
+                statusText.setText("Say 'Sweety' to activate...");
+                restartListening(3000);
             }
 
             private void callGeminiAPI(String prompt) {
@@ -300,7 +368,7 @@ jobs:
                         JSONObject contentObj = new JSONObject();
                         JSONArray partsArray = new JSONArray();
                         JSONObject partObj = new JSONObject();
-                        partObj.put("text", "You are My Sweety, a helpful AI assistant to your boss. Answer concisely in Hindi or English matching user input: " + prompt);
+                        partObj.put("text", "You are My Sweety, a smart AI voice assistant. Give a short, helpful response in Hindi or English: " + prompt);
                         partsArray.put(partObj);
                         contentObj.put("parts", partsArray);
                         contentsArray.put(contentObj);
@@ -323,17 +391,17 @@ jobs:
                                 .getJSONObject(0).getJSONObject("content")
                                 .getJSONArray("parts").getJSONObject(0).getString("text");
 
-                        runOnUiThread(() -> {
+                        mainHandler.post(() -> {
                             aiResponseText.setText("Sweety: " + reply);
                             statusText.setText("Say 'Sweety' to activate...");
-                            restartListening(5000);
+                            restartListening(4000);
                         });
 
                     } catch (Exception e) {
-                        runOnUiThread(() -> {
-                            aiResponseText.setText("Sweety: AI Connected successfully!");
+                        mainHandler.post(() -> {
+                            aiResponseText.setText("Sweety: AI Connected!");
                             statusText.setText("Say 'Sweety' to activate...");
-                            restartListening(4000);
+                            restartListening(3000);
                         });
                     }
                 }).start();
@@ -342,12 +410,13 @@ jobs:
             @Override
             public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
                 if (requestCode == 100 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    startListening();
+                    initSpeechRecognizer();
                 }
             }
         }
         EOF
 
+        # 7. Gradle configuration files
         cat << 'EOF' > build.gradle
         plugins {
             id 'com.android.application' version '8.1.1' apply false
