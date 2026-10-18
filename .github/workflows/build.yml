@@ -25,16 +25,19 @@ jobs:
         gradle-version: '8.2'
         cache-disabled: true
 
-    - name: Build with Gradle
+    - name: Build APK
       run: |
-        cd app
-        # अगर gradlew न हो तो सीधे gradle या android build कमांड चलाएँ
-        gradle assembleDebug || ../gradlew assembleDebug || echo "Build check"
+        if [ -f "./gradlew" ]; then
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        else
+          gradle assembleDebug
+        fi
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: MySweetyOS-App-Debug
         path: |
+          **/*.apk
           app/build/outputs/apk/debug/*.apk
-          **/build/outputs/apk/debug/*.apk
