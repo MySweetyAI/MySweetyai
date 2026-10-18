@@ -19,27 +19,95 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Create Complete Android Project
+    - name: Create Project Files with UI & Background Listening
       run: |
         mkdir -p app/src/main/java/com/mysweety/os
-        
-        cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
-        package com.mysweety.os;
-        import android.app.Activity;
-        import android.os.Bundle;
-        public class MainActivity extends Activity {
-            @Override
-            protected void onCreate(Bundle savedInstanceState) {
-                super.onCreate(savedInstanceState);
-            }
-        }
+        mkdir -p app/src/main/res/layout
+        mkdir -p app/src/main/res/values
+
+        # 1. Colors & Styles
+        cat << 'EOF' > app/src/main/res/values/colors.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <color name="bg_dark">#0B0E17</color>
+            <color name="cyan_glow">#00E5FF</color>
+            <color name="text_white">#FFFFFF</color>
+        </resources>
         EOF
 
+        cat << 'EOF' > app/src/main/res/values/styles.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <style name="Theme.MySweetyOS" parent="android:Theme.Material.Light.NoActionBar">
+                <item name="android:windowBackground">@color/bg_dark</item>
+            </style>
+        </resources>
+        EOF
+
+        # 2. Main Layout UI
+        cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+        <?xml version="1.0" encoding="utf-8"?>
+        <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/bg_dark"
+            android:gravity="center">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <!-- Center Glowing AI Orb Placeholder -->
+                <TextView
+                    android:id="@+id/orb_view"
+                    android:layout_width="200dp"
+                    android:layout_height="200dp"
+                    android:background="@android:color/transparent"
+                    android:gravity="center"
+                    android:text="✨"
+                    android:textSize="100sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="30dp"
+                    android:text="MY SWEETY AI"
+                    android:textColor="@color/cyan_glow"
+                    android:textSize="26sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/status_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="15dp"
+                    android:text="Listening for 'My Sweety'..."
+                    android:textColor="#88FFFFFF"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </RelativeLayout>
+        EOF
+
+        # 3. AndroidManifest.xml with Permissions
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.mysweety.os">
-            <application android:label="My Sweety OS">
-                <activity android:name=".MainActivity" android:exported="true">
+
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+            <application 
+                android:label="My Sweety OS"
+                android:theme="@style/Theme.MySweetyOS"
+                android:icon="@android:drawable/ic_btn_speak_now">
+                
+                <activity 
+                    android:name=".MainActivity" 
+                    android:exported="true">
                     <intent-filter>
                         <action android:name="android.intent.action.MAIN" />
                         <category android:name="android.intent.category.LAUNCHER" />
@@ -49,12 +117,90 @@ jobs:
         </manifest>
         EOF
 
+        # 4. MainActivity.java with Speech Recognizer Init
+        cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
+        package com.mysweety.os;
+
+        import android.Manifest;
+        import android.app.Activity;
+        import android.content.Intent;
+        import android.content.pm.PackageManager;
+        import android.os.Bundle;
+        import android.speech.RecognitionListener;
+        import android.speech.RecognizerIntent;
+        import android.speech.SpeechRecognizer;
+        import android.widget.TextView;
+        import android.widget.Toast;
+        import java.util.ArrayList;
+
+        public class MainActivity extends Activity {
+
+            private SpeechRecognizer speechRecognizer;
+            private TextView statusText;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                setContentView(R.layout.activity_main);
+
+                statusText = findViewById(R.id.status_text);
+
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 100);
+                } else {
+                    startListening();
+                }
+            }
+
+            private void startListening() {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+
+                speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                    @Override public void onReadyForSpeech(Bundle params) {}
+                    @Override public void onBeginningOfSpeech() {}
+                    @Override public void onRmsChanged(float rmsdB) {}
+                    @Override public void onBufferReceived(byte[] buffer) {}
+                    @Override public void onEndOfSpeech() {}
+                    @Override public void onError(int error) {
+                        speechRecognizer.startListening(intent);
+                    }
+                    @Override public void onResults(Bundle results) {
+                        ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        if (matches != null && !matches.isEmpty()) {
+                            String spokenText = matches.get(0).toLowerCase();
+                            if (spokenText.contains("sweety") || spokenText.contains("स्वीटी")) {
+                                Toast.makeText(MainActivity.this, "Yes Boss, Sweety Listening!", Toast.LENGTH_SHORT).show();
+                                statusText.setText("Status: Sweety Activated!");
+                            }
+                        }
+                        speechRecognizer.startListening(intent);
+                    }
+                    @Override public void onPartialResults(Bundle partialResults) {}
+                    @Override public void onEvent(int eventType, Bundle params) {}
+                });
+
+                speechRecognizer.startListening(intent);
+            }
+
+            @Override
+            public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                if (requestCode == 100 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startListening();
+                }
+            }
+        }
+        EOF
+
+        # 5. Root build.gradle
         cat << 'EOF' > build.gradle
         plugins {
             id 'com.android.application' version '8.1.1' apply false
         }
         EOF
 
+        # 6. App build.gradle
         cat << 'EOF' > app/build.gradle
         plugins {
             id 'com.android.application'
@@ -72,6 +218,7 @@ jobs:
         }
         EOF
 
+        # 7. Root settings.gradle
         cat << 'EOF' > settings.gradle
         pluginManagement {
             repositories {
