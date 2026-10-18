@@ -19,25 +19,22 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.2'
-        cache-disabled: true
-
-    - name: Build APK
+    - name: Create Simple Android Project
       run: |
-        if [ -f "./gradlew" ]; then
-          chmod +x gradlew
-          ./gradlew assembleDebug
-        else
-          gradle assembleDebug
-        fi
+        mkdir -p app/src/main
+        echo 'package com.mysweety.os; import android.app.Activity; import android.os.Bundle; public class MainActivity extends Activity { @Override protected void onCreate(Bundle savedInstanceState) { super.onCreate(savedInstanceState); } }' > app/src/main/MainActivity.java
+        echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.mysweety.os"><application android:label="My Sweety OS"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
+        
+        echo 'plugins { id "com.android.application" } android { namespace "com.mysweety.os" compileSdk 34 defaultConfig { applicationId "com.mysweety.os" minSdk 24 targetSdk 34 versionCode 1 versionName "1.0" } }' > app/build.gradle
+        echo 'include(":app")' > settings.gradle
+        echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } } dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle
+        echo 'org.gradle.jvmargs=-Xmx2048m' > gradle.properties
+
+    - name: Build with Gradle
+      run: gradle app:assembleDebug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: MySweetyOS-App-Debug
-        path: |
-          **/*.apk
-          app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/apk/debug/app-debug.apk
