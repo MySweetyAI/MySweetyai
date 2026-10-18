@@ -21,10 +21,8 @@ jobs:
 
     - name: Create Project Structure
       run: |
-        # सही फोल्डर पाथ बनाएँ
         mkdir -p app/src/main/java/com/mysweety/os
         
-        # MainActivity.java फ़ाइल बनाएँ
         cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
         package com.mysweety.os;
         import android.app.Activity;
@@ -37,7 +35,6 @@ jobs:
         }
         EOF
 
-        # AndroidManifest.xml फ़ाइल बनाएँ
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.mysweety.os">
@@ -52,11 +49,26 @@ jobs:
         </manifest>
         EOF
 
-        # app/build.gradle फ़ाइल बनाएँ
-        cat << 'EOF' > app/build.gradle
-        plugins {
-            id 'com.android.application'
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.1.1'
+            }
         }
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+        EOF
+
+        cat << 'EOF' > app/build.gradle
+        apply plugin: 'com.android.application'
         android {
             namespace 'com.mysweety.os'
             compileSdk 34
@@ -70,22 +82,7 @@ jobs:
         }
         EOF
 
-        # root settings.gradle फ़ाइल बनाएँ
         cat << 'EOF' > settings.gradle
-        pluginManagement {
-            repositories {
-                google()
-                mavenCentral()
-                gradlePluginPortal()
-            }
-        }
-        dependencyResolutionManagement {
-            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-            repositories {
-                google()
-                mavenCentral()
-            }
-        }
         rootProject.name = "My Sweety OS"
         include ':app'
         EOF
