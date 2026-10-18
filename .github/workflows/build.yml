@@ -19,16 +19,12 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.1.1'
-        cache-disabled: true
-
-    - name: Create Clean Project Files
+    - name: Create Complete Android Project
       run: |
+        # प्रोजेक्ट फोल्डर स्ट्रक्चर तैयार करना
         mkdir -p app/src/main/java/com/mysweety/os
         
+        # 1. MainActivity.java
         cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
         package com.mysweety.os;
         import android.app.Activity;
@@ -41,6 +37,7 @@ jobs:
         }
         EOF
 
+        # 2. AndroidManifest.xml
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <manifest xmlns:android="http://schemas.android.com/apk/res/android"
             package="com.mysweety.os">
@@ -55,6 +52,32 @@ jobs:
         </manifest>
         EOF
 
+        # 3. Root build.gradle
+        cat << 'EOF' > build.gradle
+        plugins {
+            id 'com.android.application' version '8.1.1' apply false
+        }
+        EOF
+
+        # 4. App build.gradle
+        cat << 'EOF' > app/build.gradle
+        plugins {
+            id 'com.android.application'
+        }
+        android {
+            namespace 'com.mysweety.os'
+            compileSdk 34
+            defaultConfig {
+                applicationId "com.mysweety.os"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        EOF
+
+        # 5. Root settings.gradle
         cat << 'EOF' > settings.gradle
         pluginManagement {
             repositories {
@@ -74,25 +97,13 @@ jobs:
         include ':app'
         EOF
 
-        cat << 'EOF' > app/build.gradle
-        plugins {
-            id 'com.android.application' version '8.1.1'
-        }
-        android {
-            namespace 'com.mysweety.os'
-            compileSdk 34
-            defaultConfig {
-                applicationId "com.mysweety.os"
-                minSdk 24
-                targetSdk 34
-                versionCode 1
-                versionName "1.0"
-            }
-        }
-        EOF
+    - name: Setup Gradle Wrapper
+      run: gradle wrapper --gradle-version 8.1.1
 
-    - name: Build APK
-      run: gradle assembleDebug
+    - name: Build APK with Gradlew
+      run: |
+        chmod +x gradlew
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
