@@ -19,7 +19,13 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Create Project Structure
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.1.1'
+        cache-disabled: true
+
+    - name: Create Clean Project Files
       run: |
         mkdir -p app/src/main/java/com/mysweety/os
         
@@ -49,26 +55,29 @@ jobs:
         </manifest>
         EOF
 
-        cat << 'EOF' > build.gradle
-        buildscript {
+        cat << 'EOF' > settings.gradle
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {
                 google()
                 mavenCentral()
             }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:8.1.1'
-            }
         }
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-            }
-        }
+        rootProject.name = "My Sweety OS"
+        include ':app'
         EOF
 
         cat << 'EOF' > app/build.gradle
-        apply plugin: 'com.android.application'
+        plugins {
+            id 'com.android.application' version '8.1.1'
+        }
         android {
             namespace 'com.mysweety.os'
             compileSdk 34
@@ -82,16 +91,8 @@ jobs:
         }
         EOF
 
-        cat << 'EOF' > settings.gradle
-        rootProject.name = "My Sweety OS"
-        include ':app'
-        EOF
-
-    - name: Build APK with Gradle Wrapper
-      run: |
-        gradle wrapper --gradle-version 8.2
-        chmod +x gradlew
-        ./gradlew assembleDebug
+    - name: Build APK
+      run: gradle assembleDebug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
