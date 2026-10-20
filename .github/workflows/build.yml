@@ -1,0 +1,285 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Create Project and Build APK
+      run: |
+        mkdir -p app/src/main/java/com/mysweety/os
+        mkdir -p app/src/main/res/values
+
+        # 1. Manifest
+        cat << 'EOF' > app/src/main/AndroidManifest.xml
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            package="com.mysweety.os">
+            <uses-permission android:name="android.permission.RECORD_AUDIO" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-permission android:name="android.permission.FLASHLIGHT" />
+            <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+            <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+            <application android:label="My Sweety OS" android:usesCleartextTraffic="true">
+                <activity android:name=".MainActivity" android:exported="true">
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+
+        # 2. MainActivity.java
+        cat << 'EOF' > app/src/main/java/com/mysweety/os/MainActivity.java
+        package com.mysweety.os;
+
+        import android.Manifest;
+        import android.app.Activity;
+        import android.content.BroadcastReceiver;
+        import android.content.Context;
+        import android.content.Intent;
+        import android.content.IntentFilter;
+        import android.content.pm.PackageManager;
+        import android.hardware.camera2.CameraManager;
+        import android.net.Uri;
+        import android.net.wifi.WifiManager;
+        import android.os.Bundle;
+        import android.os.Handler;
+        import android.os.Looper;
+        import android.speech.RecognitionListener;
+        import android.speech.RecognizerIntent;
+        import android.speech.SpeechRecognizer;
+        import android.widget.TextView;
+        import android.widget.LinearLayout;
+        import android.view.Gravity;
+        import android.graphics.Typeface;
+        import java.util.ArrayList;
+        import java.util.Locale;
+
+        public class MainActivity extends Activity {
+            private SpeechRecognizer speechRecognizer;
+            private TextView statusText, aiResponseText;
+            private Handler handler;
+            private boolean waitingForCmd = false;
+            private BroadcastReceiver powerReceiver;
+
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+                super.onCreate(savedInstanceState);
+                LinearLayout layout = new LinearLayout(this);
+                layout.setOrientation(LinearLayout.VERTICAL);
+                layout.setGravity(Gravity.CENTER);
+                layout.setBackgroundColor(0xFF050814);
+                layout.setPadding(40, 40, 40, 40);
+
+                TextView icon = new TextView(this);
+                icon.setText("💠");
+                icon.setTextSize(80);
+                icon.setGravity(Gravity.CENTER);
+                layout.addView(icon);
+
+                TextView title = new TextView(this);
+                title.setText("MY SWEETY OS");
+                title.setTextColor(0xFF00E5FF);
+                title.setTextSize(26);
+                title.setTypeface(null, Typeface.BOLD);
+                title.setGravity(Gravity.CENTER);
+                layout.addView(title);
+
+                statusText = new TextView(this);
+                statusText.setText("Say 'Sweety' to activate...");
+                statusText.setTextColor(0xB3FFFFFF);
+                statusText.setTextSize(15);
+                statusText.setGravity(Gravity.CENTER);
+                layout.addView(statusText);
+
+                aiResponseText = new TextView(this);
+                aiResponseText.setText("Smart Power & Charging Manager Active");
+                aiResponseText.setTextColor(0xFF00E5FF);
+                aiResponseText.setTextSize(14);
+                aiResponseText.setGravity(Gravity.CENTER);
+                layout.addView(aiResponseText);
+
+                setContentView(layout);
+                handler = new Handler(Looper.getMainHandler());
+
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
+                    checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, 100);
+                } else {
+                    startVoiceRecognition();
+                }
+                registerPowerReceiver();
+            }
+
+            private void registerPowerReceiver() {
+                powerReceiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        if (Intent.ACTION_POWER_CONNECTED.equals(intent.getAction())) {
+                            aiResponseText.setText("Sweety: Charger connected! Mobile Data is ON, Wi-Fi optimized.");
+                            optimizeOnCharging();
+                        }
+                    }
+                };
+                registerReceiver(powerReceiver, new IntentFilter(Intent.ACTION_POWER_CONNECTED));
+            }
+
+            private void optimizeOnCharging() {
+                try {
+                    WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    if (wifiManager != null && wifiManager.isWifiEnabled()) {
+                        wifiManager.setWifiEnabled(false);
+                    }
+                } catch (Exception e) {}
+            }
+
+            private void startVoiceRecognition() {
+                handler.post(() -> {
+                    try { if (speechRecognizer != null) speechRecognizer.destroy(); } catch (Exception e) {}
+                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                    speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                        @Override public void onReadyForSpeech(Bundle params) {
+                            statusText.setText(waitingForCmd ? "Listening command..." : "Listening for 'Sweety'...");
+                        }
+                        @Override public void onBeginningOfSpeech() {}
+                        @Override public void onRmsChanged(float rmsdB) {}
+                        @Override public void onBufferReceived(byte[] buffer) {}
+                        @Override public void onEndOfSpeech() { statusText.setText("Processing..."); }
+                        @Override public void onError(int error) { restartListening(1500); }
+                        @Override public void onResults(Bundle results) {
+                            ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                            if (matches != null && !matches.isEmpty()) {
+                                String text = matches.get(0).toLowerCase();
+                                if (!waitingForCmd) {
+                                    if (text.contains("sweety") || text.contains("स्वीटी")) {
+                                        waitingForCmd = true;
+                                        aiResponseText.setText("Yes Boss!");
+                                        statusText.setText("Activated!");
+                                        startVoiceRecognition();
+                                    } else { restartListening(500); }
+                                } else {
+                                    waitingForCmd = false;
+                                    aiResponseText.setText("You: " + matches.get(0));
+                                    processCommand(matches.get(0));
+                                }
+                            } else { restartListening(1000); }
+                        }
+                        @Override public void onPartialResults(Bundle partialResults) {}
+                        @Override public void onEvent(int eventType, Bundle params) {}
+                    });
+                    try {
+                        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+                        speechRecognizer.startListening(intent);
+                    } catch (Exception e) {}
+                });
+            }
+
+            private void restartListening(long delay) {
+                handler.postDelayed(this::startVoiceRecognition, delay);
+            }
+
+            private void processCommand(String query) {
+                String lower = query.toLowerCase();
+                if (lower.contains("torch on") || lower.contains("लाइट जलाओ")) {
+                    setTorch(true);
+                    aiResponseText.setText("Sweety: Torch ON");
+                    restartListening(3000);
+                    return;
+                }
+                if (lower.contains("torch off") || lower.contains("लाइट बंद करो")) {
+                    setTorch(false);
+                    aiResponseText.setText("Sweety: Torch OFF");
+                    restartListening(3000);
+                    return;
+                }
+                aiResponseText.setText("Sweety: Command received!");
+                restartListening(3000);
+            }
+
+            private void setTorch(boolean on) {
+                try {
+                    CameraManager cm = (CameraManager) getSystemService(CAMERA_SERVICE);
+                    cm.setTorchMode(cm.getCameraIdList()[0], on);
+                } catch (Exception e) {}
+            }
+
+            @Override
+            protected void onDestroy() {
+                super.onDestroy();
+                if (powerReceiver != null) unregisterReceiver(powerReceiver);
+            }
+
+            @Override
+            public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                if (requestCode == 100 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startVoiceRecognition();
+                }
+            }
+        }
+        EOF
+
+        # 3. Build Gradle Files
+        cat << 'EOF' > build.gradle
+        buildscript {
+            repositories { google(); mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
+        }
+        allprojects { repositories { google(); mavenCentral() } }
+        EOF
+
+        cat << 'EOF' > settings.gradle
+        rootProject.name = "My Sweety OS"
+        include ':app'
+        EOF
+
+        cat << 'EOF' > app/build.gradle
+        apply plugin: 'com.android.application'
+        android {
+            namespace 'com.mysweety.os'
+            compileSdkVersion 34
+            defaultConfig {
+                applicationId "com.mysweety.os"
+                minSdkVersion 24
+                targetSdkVersion 34
+                versionCode 1
+                versionName "1.0"
+            }
+        }
+        dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+        }
+        EOF
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.1.1'
+        cache-disabled: true
+
+    - name: Build APK Direct
+      run: gradle assembleDebug --no-daemon
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MySweetyOS-App-Debug
+        path: app/build/outputs/apk/debug/app-debug.apk
